@@ -1,0 +1,90 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Add Child</title>
+
+  <link rel="stylesheet" href="{% static 'styles/children_add.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Add Child</h1>
+
+    <p>
+      <a href="{% url 'children-list-page' %}" class="link-list">View All Children</a>
+    </p>
+
+    <form id="child-form">
+      <label>Name
+        <input name="name" required>
+      </label>
+
+      <label>Birth date
+        <input type="date" name="birth_date" required>
+      </label>
+
+      <label>Gender
+        <select name="gender" required>
+          <option value="">--select--</option>
+          <option value="boy">Boy</option>
+          <option value="girl">Girl</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+
+      <button type="submit">Create Child</button>
+      <div id="error" class="error"></div>
+    </form>
+
+    <div id="output"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('child-form');
+    const errorEl = document.getElementById('error');
+    const outputEl = document.getElementById('output');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const token = (localStorage.getItem('access') || '').trim();
+
+      if (!token) {
+        errorEl.textContent = 'No access token found in localStorage (key: "access"). Please log in first.';
+        return;
+      }
+
+      try {
+        const url = "{% url 'children-list-create' %}";
+        const res = await axios.post(
+          url,
+          {
+            name:       f.get('name'),
+            birth_date: f.get('birth_date'),
+            gender:     f.get('gender')
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        errorEl.textContent = '';
+        outputEl.innerHTML = `
+          <div class="success">
+            <h4>Child Added Successfully</h4>
+          </div>
+        `;
+        e.target.reset();
+      } catch (err) {
+        errorEl.textContent = `Error: ${err.response?.status || 'Network'} ${err.message || ''}`;
+        outputEl.innerHTML = '';
+      }
+    });
+  </script>
+</body>
+</html>

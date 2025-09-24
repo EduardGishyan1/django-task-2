@@ -1,0 +1,84 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Login</title>
+  <link rel="stylesheet" href="{% static 'styles/login.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <main class="center">
+    <section class="card">
+      <h1 class="title">Login</h1>
+
+      <form id="login-form" method="post">
+        {% csrf_token %}
+        <label class="field">
+          <span class="label">Username</span>
+          <input name="username" placeholder="Enter username" required autocomplete="username">
+        </label>
+
+        <label class="field">
+          <span class="label">Password</span>
+          <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+        </label>
+
+        <button type="submit" class="btn">Login</button>
+        <div id="error" class="error" role="alert"></div>
+      </form>
+
+      <pre id="output" class="output" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <script>
+    function getCookie(name) {
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? decodeURIComponent(m.pop()) : null;
+    }
+
+    axios.defaults.xsrfCookieName = 'csrftoken';
+    axios.defaults.xsrfHeaderName = 'X-CSRFToken';
+
+    const out = document.getElementById('output');
+    const err = document.getElementById('error');
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.textContent = '';
+      out.textContent = 'Submitting…';
+
+      const { username, password } = Object.fromEntries(new FormData(e.target));
+
+      try {
+        const res = await axios.post(
+          "{% url 'auth-login' %}",
+          { username, password },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken'),
+            },
+            withCredentials: true,
+          }
+        );
+
+        out.textContent = 'success';
+        if (res.data.access) {
+          localStorage.setItem('access', res.data.access);
+          if (res.data.refresh) {
+            localStorage.setItem('refresh', res.data.refresh);
+          }
+          window.location.href = "{% url 'children-list-page' %}";
+        }
+      } catch (e) {
+        const status = e.response?.status || 'Network';
+        err.textContent = `Error ${status}`;
+        out.textContent = '';
+      }
+    });
+  </script>
+</body>
+</html>

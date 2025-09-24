@@ -1,0 +1,100 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Add to Wishlist</title>
+  <link rel="stylesheet" href="{% static 'styles/wishlist.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Add to Wishlist</h1>
+
+    <form id="add-form">
+      <label class="field">
+        <span class="label">Choose Product</span>
+        <select id="product_select">
+          <option value="">-- Select product --</option>
+        </select>
+      </label>
+
+
+      <button type="submit">Add</button>
+      <p id="message" class="message"></p>
+    </form>
+
+    <p class="footnote">
+      <a href="/wishlist/page">Back to wishlist →</a>
+    </p>
+  </div>
+
+  <script>
+    const access = localStorage.getItem("access");
+    if (access) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+    }
+
+    const sel = document.getElementById("product_select");
+    const msg = document.getElementById("message");
+
+    async function loadProducts() {
+      sel.innerHTML = '<option value="">Loading…</option>';
+      try {
+        const res = await axios.get('/products');
+        const items = Array.isArray(res.data) ? res.data : (res.data.results || []);
+        sel.innerHTML = '<option value="">-- Select product --</option>';
+        items.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = `${p.name} ${p.price ? '— $' + p.price : ''}`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        console.warn("Could not load products", e);
+        sel.innerHTML = '<option value="">(Could not load products)</option>';
+      }
+    }
+    loadProducts();
+
+    document.getElementById("add-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+
+      let productId = sel.value;
+      if (!productId) {
+        const raw = document.getElementById("product_id").value.trim();
+        if (raw) productId = raw;
+      }
+      if (!productId) {
+        msg.textContent = "Please select or enter a product.";
+        msg.className = "message error";
+        return;
+      }
+
+      if (!access) {
+        msg.textContent = "You are not logged in. Please log in first.";
+        msg.className = "message error";
+        return;
+      }
+
+      try {
+        const res = await axios.post('/wishlist/add', { product_id: Number(productId) });
+        msg.textContent = `Added: ${res.data?.product?.name || 'Product #' + productId}`;
+        msg.className = "message success";
+        e.target.reset();
+        sel.selectedIndex = 0;
+      } catch (err) {
+        console.error(err);
+        if (err.response?.status === 401) {
+          msg.textContent = "Session expired or unauthorized. Please log in again.";
+        } else {
+          const apiErr = err.response?.data;
+          msg.textContent = apiErr?.product_id?.[0] || "Failed to add to wishlist.";
+        }
+        msg.className = "message error";
+      }
+    });
+  </script>
+</body>
+</html>

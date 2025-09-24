@@ -1,0 +1,99 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Wishlist</title>
+  <link rel="stylesheet" href="{% static 'styles/wishlist.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>My Wishlist</h1>
+
+    <div id="list" class="grid"></div>
+    <p id="message" class="message"></p>
+
+    <p class="footnote">
+      <a href="/wishlist/add-page/">Add to wishlist →</a>
+    </p>
+  </div>
+
+  <script>
+    const access = localStorage.getItem("access");
+    if (access) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+    }
+
+    const list = document.getElementById("list");
+    const msg  = document.getElementById("message");
+
+    function requireTokenOrExplain() {
+      if (!access) {
+        msg.textContent = "You are not logged in. Please log in to view your wishlist.";
+        msg.className = "message error";
+        return false;
+      }
+      return true;
+    }
+
+    async function loadWishlist() {
+      msg.textContent = "";
+      list.innerHTML = '<div class="muted">Loading…</div>';
+
+      if (!requireTokenOrExplain()) {
+        list.innerHTML = "";
+        return;
+      }
+
+      try {
+        const res = await axios.get('/wishlist');
+        const items = Array.isArray(res.data) ? res.data : (res.data.results || []);
+        if (!items.length) {
+          list.innerHTML = '<div class="muted">Your wishlist is empty.</div>';
+          return;
+        }
+        list.innerHTML = "";
+        items.forEach(it => {
+          const p = it.product || {};
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="card-title">${p.name || 'Unknown product'}</div>
+            <div class="card-price">${p.price ? '$' + p.price : ''}</div>
+            <div class="card-actions">
+              <button data-pid="${p.id}" class="danger">Remove</button>
+            </div>
+          `;
+          list.appendChild(card);
+        });
+
+        list.querySelectorAll("button.danger").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const productId = btn.getAttribute("data-pid");
+            try {
+              await axios.delete('/wishlist/remove', { params: { product_id: productId } });
+              loadWishlist();
+            } catch (e) {
+              console.error(e);
+              msg.textContent = "Failed to remove item.";
+              msg.className = "message error";
+            }
+          });
+        });
+      } catch (e) {
+        console.error(e);
+        if (e.response?.status === 401) {
+          msg.textContent = "Session expired or not authenticated. Please log in again.";
+        } else {
+          msg.textContent = "Failed to load wishlist.";
+        }
+        msg.className = "message error";
+        list.innerHTML = "";
+      }
+    }
+
+    loadWishlist();
+  </script>
+</body>
+</html>

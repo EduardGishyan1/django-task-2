@@ -1,0 +1,45 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Create Category</title>
+  <link rel="stylesheet" href="{% static 'styles/category_create.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Create a Category</h1>
+
+    <form id="category-form">
+      <label for="name">Category Name</label>
+      <input type="text" id="name" name="name" required>
+
+      <button type="submit">Create</button>
+      <p id="message" class="message"></p>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById("category-form");
+    const msg  = document.getElementById("message");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+
+      try {
+        const name = document.getElementById("name").value.trim();
+        const res = await axios.post("/categories", { name });
+        msg.textContent = `Created: ${res.data.name}`;
+        msg.className   = "message success";
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        msg.textContent = err.response?.data?.name?.[0] || "Error creating category.";
+        msg.className   = "message error";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Select Child</title>
+  <link rel="stylesheet" href="{% static 'styles/children.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Select a Child</h1>
+
+    <label>
+      Choose Child:
+      <select id="child_select">
+        <option value="">Loading…</option>
+      </select>
+    </label>
+
+    <button id="viewBtn">View Details</button>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("access");
+    if (token) axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    async function loadChildren() {
+      const sel = document.getElementById("child_select");
+      sel.innerHTML = '<option value="">Loading…</option>';
+      try {
+        const res = await axios.get("/children");
+        const items = Array.isArray(res.data) ? res.data : (res.data.results || []);
+        sel.innerHTML = '<option value="">-- Select Child --</option>';
+        items.forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c.id;
+          opt.textContent = `${c.name} (${c.birth_date})`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        sel.innerHTML = '<option value="">Error loading children</option>';
+      }
+    }
+    loadChildren();
+
+    document.getElementById("viewBtn").addEventListener("click", async () => {
+      const id = document.getElementById("child_select").value;
+      if (!id) return alert("Select a child first!");
+      try {
+        const res = await axios.get(`/children/${id}`);
+        document.getElementById("output").textContent = JSON.stringify(res.data, null, 2);
+      } catch (e) {
+        document.getElementById("output").textContent = "Error fetching child details.";
+      }
+    });
+  </script>
+</body>
+</html>

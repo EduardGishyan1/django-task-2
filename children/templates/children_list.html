@@ -1,0 +1,143 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Children – List</title>
+  <link rel="stylesheet" href="{% static 'styles/children_list.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <h1>My Children</h1>
+
+  <div class="toolbar">
+    <input id="search" placeholder="optional name filter (q)">
+    <button id="load">Load</button>
+    <a href="{% url 'children-add-page' %}" class="btn-add">Add Child</a>
+  </div>
+
+  <div id="error" class="error"></div>
+  <div id="list" class="list"></div>
+  <div id="empty" class="empty"></div>
+
+  <script>
+    const listEl  = document.getElementById('list');
+    const errorEl = document.getElementById('error');
+    const emptyEl = document.getElementById('empty');
+    const loadBtn = document.getElementById('load');
+    const baseUrl = "{% url 'children-list-create' %}";
+
+    function formatDate(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function calcAge(iso) {
+      if (!iso) return null;
+      const b = new Date(iso);
+      if (Number.isNaN(b.getTime())) return null;
+      const today = new Date();
+      let years = today.getFullYear() - b.getFullYear();
+      const m = today.getMonth() - b.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < b.getDate())) years--;
+      return years >= 0 ? years : null;
+    }
+
+    function titleCase(s) {
+      if (!s) return "—";
+      return String(s).charAt(0).toUpperCase() + String(s).slice(1);
+    }
+
+    function renderChildren(data) {
+      const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+      listEl.innerHTML = '';
+      emptyEl.textContent = '';
+
+      if (!items.length) {
+        emptyEl.textContent = 'No children found.';
+        return;
+      }
+
+      for (const child of items) {
+        const name = child.name ?? 'Unnamed';
+        const birth = child.birth_date;
+        const gender = child.gender;
+        const age = calcAge(birth);
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <h3>${escapeHtml(name)} ${gender ? `<span class="chip">${escapeHtml(titleCase(gender))}</span>` : ''}</h3>
+          <div class="meta">
+            <div class="row">
+              <span class="label">Birth date</span>
+              <span class="value">${escapeHtml(formatDate(birth))}</span>
+            </div>
+            <div class="row">
+              <span class="label">Age</span>
+              <span class="value">${age ?? '—'}</span>
+            </div>
+            ${child.parent ? `
+            <div class="row">
+              <span class="label">Parent</span>
+              <span class="value">${escapeHtml(child.parent?.username ?? String(child.parent))}</span>
+            </div>` : ''}
+          </div>
+        `;
+        listEl.appendChild(card);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    async function fetchChildren(query = '') {
+      const token = (localStorage.getItem('access') || '').trim();
+      if (!token) {
+        errorEl.textContent = 'No access token found in localStorage (key: "access").';
+        listEl.innerHTML = '';
+        emptyEl.textContent = '';
+        return;
+      }
+
+      const url = query ? `${baseUrl}?q=${encodeURIComponent(query)}` : baseUrl;
+
+      try {
+        loadBtn.disabled = true;
+        errorEl.textContent = '';
+        emptyEl.textContent = 'Loading…';
+        const res = await axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        emptyEl.textContent = '';
+        renderChildren(res.data);
+      } catch (e) {
+        listEl.innerHTML = '';
+        emptyEl.textContent = '';
+        const status = e.response?.status || 'Network';
+        const detail  = e.response?.data?.detail || e.message || '';
+        errorEl.textContent = `Error: ${status} ${detail}`;
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('load').addEventListener('click', () => {
+      const q = document.getElementById('search').value.trim();
+      fetchChildren(q);
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchChildren();
+    });
+  </script>
+</body>
+</html>

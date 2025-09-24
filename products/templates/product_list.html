@@ -1,0 +1,64 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Products</title>
+  <link rel="stylesheet" href="{% static 'styles/products.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Products</h1>
+
+    <div id="list" class="grid"></div>
+    <p id="message" class="message"></p>
+
+    <p class="footnote">
+      <a href="/products/add-page">Create a product →</a>
+    </p>
+  </div>
+
+  <script>
+    const list = document.getElementById("list");
+    const msg  = document.getElementById("message");
+
+    async function loadProducts(params = {}) {
+      msg.textContent = "";
+      list.innerHTML = '<div class="muted">Loading…</div>';
+
+      const qs = new URLSearchParams();
+      if (params.q) qs.set("q", params.q);
+
+      try {
+        const query = qs.toString();
+        const url = query ? `/products/?${query}` : '/products';
+
+        const res = await axios.get(url);
+        const items = Array.isArray(res.data) ? res.data : (res.data.results || []);
+        if (!items.length) {
+          list.innerHTML = '<div class="muted">No products found.</div>';
+          return;
+        }
+        list.innerHTML = "";
+        items.forEach(p => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="card-title">${p.name}</div>
+            <div class="card-price">$${p.price}</div>
+          `;
+          list.appendChild(card);
+        });
+      } catch (e) {
+        console.error(e);
+        msg.textContent = "Failed to load products.";
+        msg.className = "message error";
+        list.innerHTML = "";
+      }
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>

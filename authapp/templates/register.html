@@ -1,0 +1,154 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Registration</title>
+  <link rel="stylesheet" href="{% static 'styles/register.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <main class="center">
+    <section class="card">
+      <h1 class="title">Create an Account</h1>
+      <form id="register-form" method="post" novalidate>
+        {% csrf_token %}
+        <label class="field">
+          <span class="label">Username</span>
+          <input name="username" placeholder="Choose a username" required autocomplete="username">
+        </label>
+        <label class="field">
+          <span class="label">Email</span>
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </label>
+        <label class="field">
+          <span class="label">Password</span>
+          <input type="password" name="password" placeholder="••••••••" required autocomplete="new-password" minlength="8">
+        </label>
+        <label class="field">
+          <span class="label">Confirm Password</span>
+          <input type="password" name="password2" placeholder="Repeat password" required autocomplete="new-password" minlength="8">
+        </label>
+        <div class="actions">
+          <button type="button" class="btn_secondary" onclick="window.location.href='{% url 'auth-login-page' %}'">Go to Login</button>
+          <button id="submit-btn" type="submit" class="btn">Register</button>
+        </div>
+        <div id="error" class="error" role="alert" aria-live="polite"></div>
+        <pre id="output" class="output" aria-live="polite"></pre>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    function getCookie(name) {
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? decodeURIComponent(m.pop()) : null;
+    }
+
+    axios.defaults.xsrfCookieName = 'csrftoken';
+    axios.defaults.xsrfHeaderName = 'X-CSRFToken';
+
+    const form = document.getElementById('register-form');
+    const err  = document.getElementById('error');
+    const out  = document.getElementById('output');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      clearFieldErrors();
+      err.textContent = '';
+      out.textContent = '';
+      const data = Object.fromEntries(new FormData(e.target));
+
+      if (data.password !== data.password2) {
+        setFieldError('password2', 'Passwords do not match.');
+        err.textContent = 'Please fix the errors and try again.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+
+      try {
+        await axios.post(
+          "{% url 'auth-register' %}",
+          {
+            username: data.username,
+            email: data.email || undefined,
+            password: data.password,
+            password2: data.password2
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken')
+            },
+            withCredentials: true
+          }
+        );
+        out.textContent = 'Registered successfully';
+        err.textContent = '';
+      } catch (e) {
+        const status = e?.response?.status || 'Network';
+        const errors = e?.response?.data;
+
+        if (!errors || typeof errors !== 'object') {
+          err.textContent = `${status} error: ${e.message || 'Request failed'}`;
+          submitBtn.disabled = false;
+          return;
+        }
+
+        setFieldError('username', joinMsgs(errors.username));
+        setFieldError('email', joinMsgs(errors.email));
+        setFieldError('password', joinMsgs(errors.password));
+        setFieldError('password2', joinMsgs(errors.password2));
+
+        if (Array.isArray(errors.password) && errors.password.some(m => /at least 8|min|8/i.test(m))) {
+          setFieldError('password', 'Password must be at least 8 characters long.');
+        }
+
+        const userOrEmailUnique =
+          (Array.isArray(errors.username) && errors.username.some(m => /unique/i.test(m))) ||
+          (Array.isArray(errors.email) && errors.email.some(m => /unique/i.test(m)));
+
+        if (userOrEmailUnique) {
+          err.textContent = 'A user with that username or email already exists.';
+        }
+
+        if (!err.textContent) {
+          const summary = Object.entries(errors)
+            .map(([field, msgs]) => `${field}: ${joinMsgs(msgs)}`)
+            .join(' | ');
+          err.textContent = summary;
+        }
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    function joinMsgs(msgs) {
+      if (!msgs) return '';
+      return Array.isArray(msgs) ? msgs.join(' ') : String(msgs);
+    }
+
+    function setFieldError(name, message) {
+      if (!message) return;
+      const input = form.querySelector(`[name="${name}"]`);
+      if (!input) return;
+      input.classList.add('invalid');
+      let small = input.parentElement.querySelector('.field-error');
+      if (!small) {
+        small = document.createElement('small');
+        small.className = 'field-error';
+        input.parentElement.appendChild(small);
+      }
+      small.textContent = message;
+    }
+
+    function clearFieldErrors() {
+      form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+      form.querySelectorAll('.field-error').forEach(el => el.remove());
+    }
+  </script>
+</body>
+</html>
